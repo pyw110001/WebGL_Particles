@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPACEX - WebGL Telemetry Interface</title>
+  <!-- Error Logging overlay for debugging -->
+  <script>
+    window.addEventListener('error', function(e) {
+      const div = document.createElement('div');
+      div.style.position = 'fixed';
+      div.style.top = '10px';
+      div.style.left = '10px';
+      div.style.right = '10px';
+      div.style.background = 'rgba(255, 50, 50, 0.95)';
+      div.style.color = '#fff';
+      div.style.padding = '15px';
+      div.style.zIndex = '999999';
+      div.style.fontFamily = 'monospace';
+      div.style.whiteSpace = 'pre-wrap';
+      div.style.borderRadius = '5px';
+      div.style.border = '2px solid red';
+      div.innerText = 'JS Error: ' + e.message + '\nAt: ' + e.filename + ':' + e.lineno + '\nStack:\n' + (e.error ? e.error.stack : 'No stack');
+      document.body.appendChild(div);
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      const div = document.createElement('div');
+      div.style.position = 'fixed';
+      div.style.top = '10px';
+      div.style.left = '10px';
+      div.style.right = '10px';
+      div.style.background = 'rgba(255, 50, 50, 0.95)';
+      div.style.color = '#fff';
+      div.style.padding = '15px';
+      div.style.zIndex = '999999';
+      div.style.fontFamily = 'monospace';
+      div.style.whiteSpace = 'pre-wrap';
+      div.style.borderRadius = '5px';
+      div.style.border = '2px solid red';
+      div.innerText = 'Unhandled Promise Rejection: ' + e.reason + (e.reason && e.reason.stack ? '\nStack:\n' + e.reason.stack : '');
+      document.body.appendChild(div);
+    });
+  </script>
+  <!-- Google Fonts for SpaceX aesthetics -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,100;0,200;0,400;0,600;0,800;1,400&family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Fixed Cinematic Space Background -->
+  <div class="space-background"></div>
+  
+  <!-- Dynamic Three.js Particle Background -->
+  <canvas id="three-bg"></canvas>
+  
+  <!-- Interactive WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Giant Background HUD Text -->
+  <div class="background-hud-text">
+    <h1 class="hud-main-title">STARSHIP</h1>
+    <p class="hud-subtitle">HOVER & DRAW TO LAUNCH</p>
+  </div>
+
+  <!-- SpaceX telemetry HUD Header -->
+  <header class="hud-header">
+    <div class="hud-logo-section">
+      <span class="spacex-logo">S P A C E X</span>
+      <span class="hud-divider">|</span>
+      <span class="hud-status status-nominal">SYS NOMINAL</span>
+    </div>
+    <div class="hud-mission-info">
+      <span class="hud-label">MISSION:</span> <span class="hud-value">FLIGHT-47 DEEP SPACE</span>
+    </div>
+    <div class="hud-timer">
+      <span class="hud-label">MET:</span> <span id="mission-elapsed-time" class="hud-value font-mono">00:00:00:00</span>
+    </div>
+  </header>
+
+  <!-- Left Sidebar Telemetry Info -->
+  <aside class="hud-sidebar left-sidebar">
+    <div class="telemetry-group">
+      <div class="telemetry-header">NAVIGATION SYSTEM</div>
+      <div class="telemetry-row">
+        <span class="tel-label">MOUSE X:</span>
+        <span id="tel-mouse-x" class="tel-val font-mono">+0.0000</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">MOUSE Y:</span>
+        <span id="tel-mouse-y" class="tel-val font-mono">+0.0000</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">DRAW SPD:</span>
+        <span id="tel-speed" class="tel-val font-mono">0.00 km/s</span>
+      </div>
+    </div>
+
+    <div class="telemetry-group">
+      <div class="telemetry-header">VEHICLE TELEMETRY</div>
+      <div class="telemetry-row">
+        <span class="tel-label">ALTITUDE:</span>
+        <span id="tel-altitude" class="tel-val font-mono">142.34 km</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">VELOCITY:</span>
+        <span id="tel-velocity" class="tel-val font-mono">7.82 km/s</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">ACCEL:</span>
+        <span id="tel-accel" class="tel-val font-mono">1.03 G</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Sidebar System Status -->
+  <aside class="hud-sidebar right-sidebar">
+    <div class="telemetry-group">
+      <div class="telemetry-header">WEBGL STATE</div>
+      <div class="telemetry-row">
+        <span class="tel-label">ACTIVE TRAILS:</span>
+        <span id="tel-active-trails" class="tel-val font-mono">3</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">RENDER FPS:</span>
+        <span id="tel-fps" class="tel-val font-mono">60.0</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">SHADER STATE:</span>
+        <span id="tel-shader-status" class="tel-val font-mono">ACTIVE</span>
+      </div>
+    </div>
+
+    <div class="telemetry-group">
+      <div class="telemetry-header">SYSTEM CHECKS</div>
+      <div class="telemetry-row">
+        <span class="tel-label">THRUSTERS:</span>
+        <span class="tel-val status-green font-mono">READY</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">GUIDANCE:</span>
+        <span class="tel-val status-green font-mono">AUTO</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">TELEMETRY:</span>
+        <span class="tel-val status-green font-mono">ONLINE</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Customize Controller Panel -->
+  <main class="control-panel">
+    <div class="panel-header">
+      <div class="panel-title-group">
+        <h2 class="panel-title">SYSTEM CUSTOMIZE</h2>
+        <button id="btn-toggle-panel" class="panel-toggle-btn">COLLAPSE ▼</button>
+      </div>
+      <div class="presets-container">
+        <span class="presets-label">COLOR PRESET:</span>
+        <button class="preset-btn active" data-preset="falcon">FALCON HEAVY</button>
+        <button class="preset-btn" data-preset="starlink">STARLINK</button>
+        <button class="preset-btn" data-preset="dragon">DRAGON</button>
+        <button class="preset-btn" data-preset="superheavy">SUPER HEAVY</button>
+      </div>
+    </div>
+
+    <div class="sliders-grid">
+      <!-- Ribbon Count -->
+      <div class="control-group">
+        <div class="control-label-row">
+          <span class="control-name">RIBBON COUNT</span>
+          <span id="val-count" class="control-value font-mono">3</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="input-count" min="1" max="10" step="1" value="3" class="hud-slider">
+        </div>
+      </div>
+
+      <!-- Thickness -->
+      <div class="control-group">
+        <div class="control-label-row">
+          <span class="control-name">THICKNESS</span>
+          <span id="val-thickness" class="control-value font-mono">30</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="input-thickness" min="5" max="100" step="1" value="30" class="hud-slider">
+        </div>
+      </div>
+
+      <!-- Speed -->
+      <div class="control-group">
+        <div class="control-label-row">
+          <span class="control-name">SPEED</span>
+          <span id="val-speed" class="control-value font-mono">0.5</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="input-speed" min="0.1" max="2.0" step="0.1" value="0.5" class="hud-slider">
+        </div>
+      </div>
+
+      <!-- Max Age -->
+      <div class="control-group">
+        <div class="control-label-row">
+          <span class="control-name">MAX AGE (ms)</span>
+          <span id="val-max-age" class="control-value font-mono">500</span>
+        </div>
+        <div class="slider-container">
+          <input type="range" id="input-max-age" min="100" max="2000" step="50" value="500" class="hud-slider">
+        </div>
+      </div>
+
+      <!-- Enable Fade -->
+      <div class="control-group toggle-group">
+        <span class="control-name">ENABLE FADE</span>
+        <label class="hud-switch">
+          <input type="checkbox" id="input-fade" checked>
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <!-- Enable Waves -->
+      <div class="control-group toggle-group">
+        <span class="control-name">ENABLE WAVES</span>
+        <label class="hud-switch">
+          <input type="checkbox" id="input-waves" checked>
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="panel-actions">
+      <button class="ghost-btn" id="btn-reset">RESET ENGINE</button>
+      <button class="ghost-btn" id="btn-sync">TELEMETRY SYNC</button>
+      <button class="ghost-btn" id="btn-capture">CAPTURE SCAN</button>
+    </div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
