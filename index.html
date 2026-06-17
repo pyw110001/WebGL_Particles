@@ -57,21 +57,17 @@
   <!-- Interactive WebGL Canvas Container -->
   <div id="canvas-container"></div>
 
-  <!-- Giant Background HUD Text -->
-  <div class="background-hud-text">
-    <h1 class="hud-main-title">STARSHIP</h1>
-    <p class="hud-subtitle">HOVER & DRAW TO LAUNCH</p>
-  </div>
+  <!-- Interactive Fluid WebGL Canvas -->
+  <canvas id="fluid-canvas"></canvas>
+
+
 
   <!-- SpaceX telemetry HUD Header -->
   <header class="hud-header">
     <div class="hud-logo-section">
-      <span class="spacex-logo">S P A C E X</span>
+      <span class="spacex-logo">Z - L A B</span>
       <span class="hud-divider">|</span>
       <span class="hud-status status-nominal">SYS NOMINAL</span>
-    </div>
-    <div class="hud-mission-info">
-      <span class="hud-label">MISSION:</span> <span class="hud-value">FLIGHT-47 DEEP SPACE</span>
     </div>
     <div class="hud-timer">
       <span class="hud-label">MET:</span> <span id="mission-elapsed-time" class="hud-value font-mono">00:00:00:00</span>
@@ -113,118 +109,160 @@
     </div>
   </aside>
 
-  <!-- Right Sidebar System Status -->
-  <aside class="hud-sidebar right-sidebar">
-    <div class="telemetry-group">
-      <div class="telemetry-header">WEBGL STATE</div>
-      <div class="telemetry-row">
-        <span class="tel-label">ACTIVE TRAILS:</span>
-        <span id="tel-active-trails" class="tel-val font-mono">3</span>
-      </div>
-      <div class="telemetry-row">
-        <span class="tel-label">RENDER FPS:</span>
-        <span id="tel-fps" class="tel-val font-mono">60.0</span>
-      </div>
-      <div class="telemetry-row">
-        <span class="tel-label">SHADER STATE:</span>
-        <span id="tel-shader-status" class="tel-val font-mono">ACTIVE</span>
-      </div>
-    </div>
 
-    <div class="telemetry-group">
-      <div class="telemetry-header">SYSTEM CHECKS</div>
-      <div class="telemetry-row">
-        <span class="tel-label">THRUSTERS:</span>
-        <span class="tel-val status-green font-mono">READY</span>
-      </div>
-      <div class="telemetry-row">
-        <span class="tel-label">GUIDANCE:</span>
-        <span class="tel-val status-green font-mono">AUTO</span>
-      </div>
-      <div class="telemetry-row">
-        <span class="tel-label">TELEMETRY:</span>
-        <span class="tel-val status-green font-mono">ONLINE</span>
-      </div>
-    </div>
-  </aside>
 
   <!-- Bottom Customize Controller Panel -->
   <main class="control-panel">
     <div class="panel-header">
-      <div class="panel-title-group">
+      <div class="panel-header-row-1">
         <h2 class="panel-title">SYSTEM CUSTOMIZE</h2>
         <button id="btn-toggle-panel" class="panel-toggle-btn">COLLAPSE ▼</button>
       </div>
-      <div class="presets-container">
-        <span class="presets-label">COLOR PRESET:</span>
-        <button class="preset-btn active" data-preset="falcon">FALCON HEAVY</button>
-        <button class="preset-btn" data-preset="starlink">STARLINK</button>
-        <button class="preset-btn" data-preset="dragon">DRAGON</button>
-        <button class="preset-btn" data-preset="superheavy">SUPER HEAVY</button>
+      <div class="panel-header-row-2">
+        <div class="effects-group">
+          <span class="presets-label">EFFECT:</span>
+          <button class="effect-btn active" data-effect="ribbons">RIBBONS</button>
+          <button class="effect-btn" data-effect="fluids">FLUIDS</button>
+        </div>
+        <div class="presets-group">
+          <span class="presets-label">COLOR PRESET:</span>
+          <button class="preset-btn active" data-preset="falcon">FALCON HEAVY</button>
+          <button class="preset-btn" data-preset="starlink">STARLINK</button>
+          <button class="preset-btn" data-preset="dragon">DRAGON</button>
+          <button class="preset-btn" data-preset="superheavy">SUPER HEAVY</button>
+        </div>
       </div>
     </div>
 
     <div class="sliders-grid">
-      <!-- Ribbon Count -->
-      <div class="control-group">
-        <div class="control-label-row">
-          <span class="control-name">RIBBON COUNT</span>
-          <span id="val-count" class="control-value font-mono">3</span>
+      <!-- RIBBON SETTINGS SUBGRID -->
+      <div id="ribbon-settings" class="settings-subgrid">
+        <!-- Ribbon Count -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">RIBBON COUNT</span>
+            <span id="val-count" class="control-value font-mono">3</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-count" min="1" max="10" step="1" value="3" class="hud-slider">
+          </div>
         </div>
-        <div class="slider-container">
-          <input type="range" id="input-count" min="1" max="10" step="1" value="3" class="hud-slider">
+
+        <!-- Thickness -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">THICKNESS</span>
+            <span id="val-thickness" class="control-value font-mono">30</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-thickness" min="5" max="100" step="1" value="30" class="hud-slider">
+          </div>
+        </div>
+
+        <!-- Speed -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">SPEED</span>
+            <span id="val-speed" class="control-value font-mono">0.5</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-speed" min="0.1" max="2.0" step="0.1" value="0.5" class="hud-slider">
+          </div>
+        </div>
+
+        <!-- Max Age -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">MAX AGE (ms)</span>
+            <span id="val-max-age" class="control-value font-mono">500</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-max-age" min="100" max="2000" step="50" value="500" class="hud-slider">
+          </div>
+        </div>
+
+        <!-- Enable Fade -->
+        <div class="control-group toggle-group">
+          <span class="control-name">ENABLE FADE</span>
+          <label class="hud-switch">
+            <input type="checkbox" id="input-fade" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Enable Waves -->
+        <div class="control-group toggle-group">
+          <span class="control-name">ENABLE WAVES</span>
+          <label class="hud-switch">
+            <input type="checkbox" id="input-waves" checked>
+            <span class="switch-slider"></span>
+          </label>
         </div>
       </div>
 
-      <!-- Thickness -->
-      <div class="control-group">
-        <div class="control-label-row">
-          <span class="control-name">THICKNESS</span>
-          <span id="val-thickness" class="control-value font-mono">30</span>
+      <!-- FLUID SETTINGS SUBGRID -->
+      <div id="fluid-settings" class="settings-subgrid" style="display: none;">
+        <!-- Fluid Curl -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">FLUID CURL</span>
+            <span id="val-curl" class="control-value font-mono">3.0</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-curl" min="0.5" max="10.0" step="0.5" value="3.0" class="hud-slider">
+          </div>
         </div>
-        <div class="slider-container">
-          <input type="range" id="input-thickness" min="5" max="100" step="1" value="30" class="hud-slider">
-        </div>
-      </div>
 
-      <!-- Speed -->
-      <div class="control-group">
-        <div class="control-label-row">
-          <span class="control-name">SPEED</span>
-          <span id="val-speed" class="control-value font-mono">0.5</span>
+        <!-- Splat Radius -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">SPLAT RADIUS</span>
+            <span id="val-splat-radius" class="control-value font-mono">0.20</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-splat-radius" min="0.05" max="0.8" step="0.05" value="0.20" class="hud-slider">
+          </div>
         </div>
-        <div class="slider-container">
-          <input type="range" id="input-speed" min="0.1" max="2.0" step="0.1" value="0.5" class="hud-slider">
-        </div>
-      </div>
 
-      <!-- Max Age -->
-      <div class="control-group">
-        <div class="control-label-row">
-          <span class="control-name">MAX AGE (ms)</span>
-          <span id="val-max-age" class="control-value font-mono">500</span>
+        <!-- Velocity Dissipation -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">VELOCITY DISSIPATION</span>
+            <span id="val-vel-diss" class="control-value font-mono">2.0</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-vel-diss" min="0.5" max="5.0" step="0.1" value="2.0" class="hud-slider">
+          </div>
         </div>
-        <div class="slider-container">
-          <input type="range" id="input-max-age" min="100" max="2000" step="50" value="500" class="hud-slider">
+
+        <!-- Particles Time -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">PARTICLES TIME</span>
+            <span id="val-particles-time" class="control-value font-mono">2.8s</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-particles-time" min="0.5" max="5.0" step="0.1" value="2.8" class="hud-slider">
+          </div>
         </div>
-      </div>
 
-      <!-- Enable Fade -->
-      <div class="control-group toggle-group">
-        <span class="control-name">ENABLE FADE</span>
-        <label class="hud-switch">
-          <input type="checkbox" id="input-fade" checked>
-          <span class="switch-slider"></span>
-        </label>
-      </div>
+        <!-- Rainbow Mode -->
+        <div class="control-group toggle-group">
+          <span class="control-name">RAINBOW MODE</span>
+          <label class="hud-switch">
+            <input type="checkbox" id="input-rainbow" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
 
-      <!-- Enable Waves -->
-      <div class="control-group toggle-group">
-        <span class="control-name">ENABLE WAVES</span>
-        <label class="hud-switch">
-          <input type="checkbox" id="input-waves" checked>
-          <span class="switch-slider"></span>
-        </label>
+        <!-- Shading -->
+        <div class="control-group toggle-group">
+          <span class="control-name">FLUID SHADING</span>
+          <label class="hud-switch">
+            <input type="checkbox" id="input-shading" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
       </div>
     </div>
 

@@ -262,16 +262,32 @@ body {
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 16px;
   border-bottom: 1px solid rgba(240, 240, 250, 0.05);
-  padding-bottom: 12px;
+  padding-bottom: 16px;
 }
 
-.panel-title-group {
+.panel-header-row-1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.panel-header-row-2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.effects-group, .presets-group {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .panel-toggle-btn {
@@ -342,21 +358,7 @@ body {
 
 /* Sliders Grid */
 .sliders-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-@media (max-width: 900px) {
-  .sliders-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .sliders-grid {
-    grid-template-columns: 1fr;
-  }
+  width: 100%;
 }
 
 .control-group {
@@ -444,10 +446,16 @@ body {
 }
 
 /* Toggle Switch Styling */
-.toggle-group {
+.control-group.toggle-group {
+  display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 20px;
+}
+
+.control-group.toggle-group .control-name {
+  margin-bottom: 0;
 }
 
 .hud-switch {
@@ -458,9 +466,11 @@ body {
 }
 
 .hud-switch input {
+  position: absolute;
   opacity: 0;
   width: 0;
   height: 0;
+  pointer-events: none;
 }
 
 .switch-slider {
@@ -532,4 +542,67 @@ body {
 
 .ghost-btn:active {
   transform: scale(0.97);
+}
+
+/* Fluid Canvas Styling */
+#fluid-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: auto;
+  display: none;
+}
+
+/* Customizer Effect Buttons Styling */
+.effect-btn {
+  background: transparent;
+  border: 1px solid rgba(240, 240, 250, 0.15);
+  border-radius: 20px;
+  color: rgba(240, 240, 250, 0.6);
+  padding: 5px 14px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.effect-btn:hover {
+  border-color: rgba(240, 240, 250, 0.4);
+  color: #f0f0fa;
+  background: rgba(240, 240, 250, 0.03);
+}
+
+.effect-btn.active {
+  border-color: #f0f0fa;
+  color: #000000;
+  background: #f0f0fa;
+}
+
+/* Settings Subgrid System */
+.settings-subgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+  .settings-subgrid {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 640px;
+  }
+}
+
+@media (max-width: 600px) {
+  .settings-subgrid {
+    grid-template-columns: 1fr;
+    max-width: 320px;
+  }
 }
