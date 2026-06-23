@@ -915,8 +915,8 @@ class RibbonApp {
     presetButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
         presetButtons.forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        this.preset = e.target.getAttribute('data-preset');
+        btn.classList.add('active');
+        this.preset = btn.getAttribute('data-preset');
         this.buildLines();
 
         // Sync colors to fluid if active
@@ -2385,8 +2385,8 @@ document.addEventListener('DOMContentLoaded', () => {
   modeButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
       modeButtons.forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      const mode = e.target.getAttribute('data-mode');
+      btn.classList.add('active');
+      const mode = btn.getAttribute('data-mode');
       window.controlMode = mode;
 
       const previewGroup = document.querySelector('.camera-preview-group');
@@ -2425,8 +2425,8 @@ document.addEventListener('DOMContentLoaded', () => {
   effectButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
       effectButtons.forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      const effect = e.target.getAttribute('data-effect');
+      btn.classList.add('active');
+      const effect = btn.getAttribute('data-effect');
 
       if (effect === 'ribbons') {
         // Switch views
