@@ -219,8 +219,10 @@ class GestureController {
         activeIndex = idx;
       }
     });
+    console.log('[GestureController] triggerEffectSwitch activeIndex:', activeIndex);
     if (activeIndex !== -1) {
       const nextIndex = (activeIndex + 1) % buttons.length;
+      console.log('[GestureController] Clicking button index:', nextIndex, 'element:', buttons[nextIndex]);
       buttons[nextIndex].click();
     }
   }
@@ -2424,9 +2426,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   effectButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
+      console.log('[Effect Switch Listener] Event triggered on button:', btn, 'data-effect:', btn.getAttribute('data-effect'));
       effectButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const effect = btn.getAttribute('data-effect');
+      console.log('[Effect Switch Listener] Target effect chosen:', effect);
 
       if (effect === 'ribbons') {
         // Switch views
