@@ -795,6 +795,7 @@ class RibbonApp {
     if (this.paused) {
       this.paused = false;
       this.lastTime = performance.now();
+      this.resize(); // 强制重新计算大小，解决 display: none 到 block 切换导致的视口尺寸失效问题
       this.animate();
       
       // Sync UI stats
