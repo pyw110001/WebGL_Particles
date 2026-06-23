@@ -427,6 +427,19 @@ class GestureController {
     }
   }
 
+  updateSmoothCoords() {
+    if (this.wristVisible && this.wristDetectedThisFrame) {
+      this.wristX = this.wristX + (this.rawWristX - this.wristX) * 0.18;
+      this.wristY = this.wristY + (this.rawWristY - this.wristY) * 0.18;
+    }
+    return {
+      x: this.wristX,
+      y: this.wristY,
+      visible: this.wristVisible
+    };
+  }
+}
+
 // ==========================================
 // THREE.JS PARTICLES BACKGROUND
 // ==========================================
