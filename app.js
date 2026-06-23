@@ -139,7 +139,8 @@ class GestureController {
     this.wristDetectedThisFrame = false;
 
     // 左手手势触发状态与计时器
-    this.lastFistState = false;
+    this.lastEffectOpenState = false;
+    this.effectTriggerTimer = 0.0;
     this.colorTriggerTimer = 0.0;
   }
 
@@ -194,7 +195,8 @@ class GestureController {
     }
     this.wristVisible = false;
     this.wristDetectedThisFrame = false;
-    this.lastFistState = false;
+    this.lastEffectOpenState = false;
+    this.effectTriggerTimer = 0.0;
     this.colorTriggerTimer = 0.0;
     this.updateStatus('gray', 'OFFLINE');
     if (this.coordsEl) this.coordsEl.innerText = 'N/A';
@@ -352,8 +354,8 @@ class GestureController {
         const avgHandDist = (wristToPinky + wristToIndex) / 2.0;
         const handRatio = avgHandDist / shoulderDist;
         
-        const isHandRaised = lWrist.y < (lElbow.y + 0.05); // 左手高度高于肘部偏下5%屏高，更加宽松
-        const isFist = isHandRaised && (handRatio < 0.125); // 握拳判定门限从 0.11 放宽到 0.125
+        const isHandRaised = lWrist.y < (lElbow.y + 0.05); // 左手高度高于肘部偏下5%屏高
+        const isOpenHand = handRatio > 0.14; // 张开手判定
         
         const lWristCanvasX = (1.0 - lWrist.x) * width;
         const lWristCanvasY = lWrist.y * height;
@@ -366,29 +368,48 @@ class GestureController {
         ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 17);
         ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 8);
 
-        // 握拳切换 EFFECT (边缘触发，防抖动)
-        if (isFist) {
-          if (!this.lastFistState) {
-            this.triggerEffectSwitch();
-            this.lastFistState = true;
+        const isHighRaised = lWrist.y < lShoulder.y;
+        
+        // 判定特效切换：张手且低于肩膀（但高于肘部区域）
+        const isEffectTriggerZone = isHandRaised && !isHighRaised && isOpenHand;
+
+        if (isEffectTriggerZone) {
+          if (this.lastEffectOpenState) {
+            // 已触发状态：画出稳定指示圈和文字
+            ctx.beginPath();
+            ctx.arc(lWristCanvasX, lWristCanvasY, 11, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#00F2FE';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#00F2FE';
+            ctx.font = 'bold 8px monospace';
+            ctx.fillText('OPEN [SWAP EFFECT]', lWristCanvasX + 15, lWristCanvasY + 12);
+          } else {
+            this.effectTriggerTimer += 0.033;
+            
+            // 悬停中：画出快速加载进度环 (0.25 秒 hover 防抖动)
+            const progress = Math.min(1.0, this.effectTriggerTimer / 0.25);
+            ctx.beginPath();
+            ctx.arc(lWristCanvasX, lWristCanvasY, 11, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+            ctx.strokeStyle = '#00F2FE';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            if (this.effectTriggerTimer >= 0.25) {
+              this.triggerEffectSwitch();
+              this.lastEffectOpenState = true;
+              this.effectTriggerTimer = 0.0;
+            }
+          }
+        } else {
+          this.effectTriggerTimer = 0.0;
+          if (!isOpenHand || !isHandRaised) {
+            this.lastEffectOpenState = false;
           }
           
-          // 画出左手握拳的指示圈
-          ctx.beginPath();
-          ctx.arc(lWristCanvasX, lWristCanvasY, 11, 0, 2 * Math.PI);
-          ctx.strokeStyle = '#00F2FE';
-          ctx.lineWidth = 2.5;
-          ctx.stroke();
-          
-          ctx.fillStyle = '#00F2FE';
-          ctx.font = 'bold 8px monospace';
-          ctx.fillText('FIST [SWAP EFFECT]', lWristCanvasX + 15, lWristCanvasY + 12);
-        } else {
-          this.lastFistState = false;
-          
           // 高举过肩张开手切换 COLOR PRESET (1 秒悬停)
-          const isHighRaised = lWrist.y < lShoulder.y;
-          if (isHandRaised && isHighRaised && handRatio > 0.14) {
+          if (isHandRaised && isHighRaised && isOpenHand) {
             if (this.colorTriggerTimer >= 0) {
               this.colorTriggerTimer += 0.033; // 按帧步长计时
               
