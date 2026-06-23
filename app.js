@@ -256,7 +256,7 @@ class GestureController {
       const rWrist = results.poseLandmarks[16];
       
       const lShoulder = results.poseLandmarks[11];
-      const lHip = results.poseLandmarks[23];
+      const lElbow = results.poseLandmarks[13];
       const lWrist = results.poseLandmarks[15];
       const lPinky = results.poseLandmarks[17];
       const lIndex = results.poseLandmarks[19];
@@ -342,9 +342,9 @@ class GestureController {
       }
 
       // 3. 左手手势检测（握拳切 EFFECT / 张手高举切 COLOR PRESET）
-      if (lShoulder && rShoulder && lHip && lWrist && lPinky && lIndex &&
+      if (lShoulder && rShoulder && lElbow && lWrist && lPinky && lIndex &&
           lShoulder.visibility > 0.5 && rShoulder.visibility > 0.5 &&
-          lHip.visibility > 0.5 && lWrist.visibility > 0.5) {
+          lElbow.visibility > 0.5 && lWrist.visibility > 0.5) {
         
         const shoulderDist = dist3D(lShoulder, rShoulder);
         const wristToPinky = dist3D(lWrist, lPinky);
@@ -352,7 +352,7 @@ class GestureController {
         const avgHandDist = (wristToPinky + wristToIndex) / 2.0;
         const handRatio = avgHandDist / shoulderDist;
         
-        const isHandRaised = lWrist.y < lHip.y; // 左手高度高于臀部
+        const isHandRaised = lWrist.y < lElbow.y; // 左手高度高于肘部
         const isFist = isHandRaised && (handRatio < 0.11);
         
         // 握拳切换 EFFECT (边缘触发，防抖动)
