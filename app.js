@@ -366,28 +366,20 @@ class GestureController {
         const lWristCanvasX = (1.0 - lWrist.x) * width;
         const lWristCanvasY = lWrist.y * height;
 
-        const shoulderDist2D = dist2D(lShoulder, rShoulder);
-        let handToShoulderDist2D = 999;
-        const touchThreshold2D = shoulderDist2D * 0.45; // 左手腕距离右肩在 45% 肩宽内算“摸右肩”
-        
-        if (rShoulder && rShoulder.visibility > 0.5) {
-          handToShoulderDist2D = dist2D(lWrist, rShoulder);
-        }
-        
-        const isTouchShoulder = handToShoulderDist2D < touchThreshold2D;
-
-        // 绘制实时调试信息框 (提供左手腕到右肩距离与阈值的调试反馈)
+        // 绘制实时调试信息框
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(lWristCanvasX + 15, lWristCanvasY - 33, 95, 32);
+        ctx.fillRect(lWristCanvasX + 15, lWristCanvasY - 25, 80, 24);
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 7px monospace';
-        ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 25);
-        ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 16);
-        ctx.fillText(`Touch: ${handToShoulderDist2D.toFixed(3)}/${touchThreshold2D.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 7);
+        ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 17);
+        ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 8);
 
         const isHighRaised = lWrist.y < lShoulder.y;
+        
+        // 判定特效切换：左手张开，抬起且低于左肩
+        const isEffectTriggerZone = isHandRaised && !isHighRaised && isOpenHand;
 
-        if (isTouchShoulder) {
+        if (isEffectTriggerZone) {
           if (this.lastEffectOpenState) {
             // 已触发状态：画出稳定指示圈和文字
             ctx.beginPath();
@@ -398,7 +390,7 @@ class GestureController {
             
             ctx.fillStyle = '#00F2FE';
             ctx.font = 'bold 8px monospace';
-            ctx.fillText('TOUCH [SWAP EFFECT]', lWristCanvasX + 18, lWristCanvasY + 3);
+            ctx.fillText('OPEN [SWAP EFFECT]', lWristCanvasX + 18, lWristCanvasY + 3);
           } else {
             this.effectTriggerTimer += 0.033;
             
@@ -418,7 +410,9 @@ class GestureController {
           }
         } else {
           this.effectTriggerTimer = 0.0;
-          this.lastEffectOpenState = false;
+          if (!isOpenHand || !isHandRaised || isHighRaised) {
+            this.lastEffectOpenState = false;
+          }
           
           // 高举过肩张开手切换 COLOR PRESET (1 秒悬停)
           if (isHandRaised && isHighRaised && isOpenHand) {
