@@ -46,6 +46,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,100;0,200;0,400;0,600;0,800;1,400&family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 </head>
 <body>
   <!-- Fixed Cinematic Space Background -->
@@ -107,6 +109,22 @@
         <span id="tel-accel" class="tel-val font-mono">1.03 G</span>
       </div>
     </div>
+
+    <div class="telemetry-group camera-preview-group">
+      <div class="telemetry-header">CAMERA PREVIEW</div>
+      <div class="camera-window">
+        <video id="webcam" autoplay playsinline style="display:none;"></video>
+        <canvas id="camera-canvas" width="200" height="150"></canvas>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">STATUS:</span>
+        <span id="tel-pose-status" class="tel-val status-gray font-mono">OFFLINE</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="tel-label">WRIST X/Y:</span>
+        <span id="tel-wrist-coords" class="tel-val font-mono">N/A</span>
+      </div>
+    </div>
   </aside>
 
 
@@ -123,6 +141,11 @@
           <span class="presets-label">EFFECT:</span>
           <button class="effect-btn active" data-effect="ribbons">RIBBONS</button>
           <button class="effect-btn" data-effect="fluids">FLUIDS</button>
+        </div>
+        <div class="control-mode-group">
+          <span class="presets-label">INPUT MODE:</span>
+          <button class="control-mode-btn active" data-mode="mouse">MOUSE</button>
+          <button class="control-mode-btn" data-mode="gesture">GESTURE</button>
         </div>
         <div class="presets-group">
           <span class="presets-label">COLOR PRESET:</span>

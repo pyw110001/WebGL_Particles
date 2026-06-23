@@ -606,3 +606,89 @@ body {
     max-width: 320px;
   }
 }
+
+/* Control Mode buttons */
+.control-mode-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-mode-btn {
+  background: transparent;
+  border: 1px solid rgba(240, 240, 250, 0.15);
+  border-radius: 20px;
+  color: rgba(240, 240, 250, 0.6);
+  padding: 5px 14px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.control-mode-btn:hover {
+  border-color: rgba(240, 240, 250, 0.4);
+  color: #f0f0fa;
+  background: rgba(240, 240, 250, 0.03);
+}
+
+.control-mode-btn.active {
+  border-color: #f0f0fa;
+  color: #000000;
+  background: #f0f0fa;
+}
+
+/* Camera Preview Window HUD styles */
+.camera-preview-group {
+  margin-top: 15px;
+  display: none;
+}
+
+.camera-window {
+  width: 200px;
+  height: 150px;
+  border: 1px solid rgba(240, 240, 250, 0.08);
+  border-radius: 6px;
+  background: rgba(8, 8, 12, 0.8);
+  overflow: hidden;
+  margin: 10px 0;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+#camera-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Status colors with telemetry HUD tags */
+.status-gray {
+  color: rgba(240, 240, 250, 0.5);
+  background-color: rgba(240, 240, 250, 0.04);
+  border: 1px solid rgba(240, 240, 250, 0.15);
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  border-radius: 2px;
+}
+
+.status-yellow {
+  color: #ffaa00;
+  background-color: rgba(255, 170, 0, 0.08);
+  border: 1px solid rgba(255, 170, 0, 0.2);
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  border-radius: 2px;
+}
+
+.status-green {
+  color: #00ffaa;
+  background-color: rgba(0, 255, 170, 0.08);
+  border: 1px solid rgba(0, 255, 170, 0.2);
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  border-radius: 2px;
+}
+

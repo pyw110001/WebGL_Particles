@@ -117,6 +117,317 @@ function getColorsForCount(presetName, count) {
 }
 
 // ==========================================
+// GESTURE CONTROLLER (MEDIAPIPE POSE)
+// ==========================================
+class GestureController {
+  constructor() {
+    this.video = document.getElementById('webcam');
+    this.canvas = document.getElementById('camera-canvas');
+    this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+    this.statusEl = document.getElementById('tel-pose-status');
+    this.coordsEl = document.getElementById('tel-wrist-coords');
+    
+    this.active = false;
+    this.camera = null;
+    this.pose = null;
+    
+    this.rawWristX = 0.5;
+    this.rawWristY = 0.5;
+    this.wristX = 0.5;
+    this.wristY = 0.5;
+    this.wristVisible = false;
+    this.wristDetectedThisFrame = false;
+
+    // 左手手势触发状态与计时器
+    this.lastFistState = false;
+    this.colorTriggerTimer = 0.0;
+  }
+
+  init() {
+    if (this.pose) return;
+
+    this.updateStatus('yellow', 'LOADING MODEL...');
+
+    this.pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+
+    this.pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    this.pose.onResults((results) => this.onResults(results));
+  }
+
+  async start() {
+    this.active = true;
+    this.init();
+
+    try {
+      if (!this.camera) {
+        this.camera = new Camera(this.video, {
+          onFrame: async () => {
+            if (this.active) {
+              await this.pose.send({ image: this.video });
+            }
+          },
+          width: 320,
+          height: 240
+        });
+      }
+      this.updateStatus('yellow', 'CAMERA ACTIVE');
+      await this.camera.start();
+    } catch (err) {
+      console.error('Camera start failed:', err);
+      this.updateStatus('red', 'WEBCAM ERROR');
+    }
+  }
+
+  stop() {
+    this.active = false;
+    if (this.camera) {
+      this.camera.stop();
+      this.camera = null;
+    }
+    this.wristVisible = false;
+    this.wristDetectedThisFrame = false;
+    this.lastFistState = false;
+    this.colorTriggerTimer = 0.0;
+    this.updateStatus('gray', 'OFFLINE');
+    if (this.coordsEl) this.coordsEl.innerText = 'N/A';
+    if (this.ctx) {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  }
+
+  updateStatus(colorClass, text) {
+    if (!this.statusEl) return;
+    this.statusEl.className = `tel-val font-mono status-${colorClass}`;
+    this.statusEl.innerText = text;
+  }
+
+  triggerEffectSwitch() {
+    const buttons = document.querySelectorAll('.effect-btn');
+    buttons.forEach(btn => {
+      if (!btn.classList.contains('active')) {
+        btn.click();
+      }
+    });
+  }
+
+  triggerPresetSwitch() {
+    const buttons = document.querySelectorAll('.preset-btn');
+    let activeIndex = -1;
+    buttons.forEach((btn, idx) => {
+      if (btn.classList.contains('active')) {
+        activeIndex = idx;
+      }
+    });
+    if (activeIndex !== -1) {
+      const nextIndex = (activeIndex + 1) % buttons.length;
+      buttons[nextIndex].click();
+    }
+  }
+
+  onResults(results) {
+    if (!this.active || !this.ctx) return;
+
+    const ctx = this.ctx;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+
+    // 1. 镜像绘制视频帧
+    ctx.translate(width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(results.image, 0, 0, width, height);
+    ctx.restore();
+
+    // 2. 绘制骨架和右肩、右手腕圈注
+    if (results.poseLandmarks) {
+      this.wristDetectedThisFrame = false;
+
+      const rShoulder = results.poseLandmarks[12];
+      const rWrist = results.poseLandmarks[16];
+      
+      const lShoulder = results.poseLandmarks[11];
+      const lHip = results.poseLandmarks[23];
+      const lWrist = results.poseLandmarks[15];
+      const lPinky = results.poseLandmarks[17];
+      const lIndex = results.poseLandmarks[19];
+
+      ctx.strokeStyle = 'rgba(0, 255, 170, 0.5)';
+      ctx.lineWidth = 3;
+
+      const drawLine = (p1, p2) => {
+        if (p1 && p2 && p1.visibility > 0.5 && p2.visibility > 0.5) {
+          ctx.beginPath();
+          ctx.moveTo((1.0 - p1.x) * width, p1.y * height);
+          ctx.lineTo((1.0 - p2.x) * width, p2.y * height);
+          ctx.stroke();
+        }
+      };
+
+      const dist3D = (p1, p2) => {
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        const dz = p1.z - p2.z;
+        return Math.sqrt(dx*dx + dy*dy + dz*dz);
+      };
+
+      // 右臂 (右肩 12 -> 右肘 14 -> 右手腕 16)
+      drawLine(results.poseLandmarks[12], results.poseLandmarks[14]);
+      drawLine(results.poseLandmarks[14], results.poseLandmarks[16]);
+
+      // 左臂 (左肩 11 -> 左肘 13 -> 左手腕 15)
+      drawLine(results.poseLandmarks[11], results.poseLandmarks[13]);
+      drawLine(results.poseLandmarks[13], results.poseLandmarks[15]);
+
+      // 躯干 (左肩 11 -> 右肩 12 -> 右胯 24 -> 左胯 23 -> 左肩 11)
+      drawLine(results.poseLandmarks[11], results.poseLandmarks[12]);
+      drawLine(results.poseLandmarks[12], results.poseLandmarks[24]);
+      drawLine(results.poseLandmarks[24], results.poseLandmarks[23]);
+      drawLine(results.poseLandmarks[23], results.poseLandmarks[11]);
+
+      // 标注右肩 (12) 圈
+      if (rShoulder && rShoulder.visibility > 0.5) {
+        ctx.beginPath();
+        ctx.arc((1.0 - rShoulder.x) * width, rShoulder.y * height, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = '#00ffaa';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // 标注并验证右手腕 (16)
+      if (rWrist && rWrist.visibility > 0.5) {
+        this.wristDetectedThisFrame = true;
+        this.rawWristX = 1.0 - rWrist.x; // 镜像翻转
+        this.rawWristY = rWrist.y;
+        this.wristVisible = true;
+
+        // 腕点圈
+        ctx.beginPath();
+        ctx.arc(this.rawWristX * width, this.rawWristY * height, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ff3333';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 准星十字辅助线
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(this.rawWristX * width - 12, this.rawWristY * height);
+        ctx.lineTo(this.rawWristX * width + 12, this.rawWristY * height);
+        ctx.moveTo(this.rawWristX * width, this.rawWristY * height - 12);
+        ctx.lineTo(this.rawWristX * width, this.rawWristY * height + 12);
+        ctx.stroke();
+
+        this.updateStatus('green', 'LOCKED WRIST');
+        if (this.coordsEl) {
+          this.coordsEl.innerText = `${(this.rawWristX * 2 - 1).toFixed(2)}, ${(this.rawWristY * -2 + 1).toFixed(2)}`;
+        }
+      } else {
+        this.wristVisible = false;
+        this.updateStatus('yellow', 'NO WRIST DETECTED');
+        if (this.coordsEl) this.coordsEl.innerText = 'N/A';
+      }
+
+      // 3. 左手手势检测（握拳切 EFFECT / 张手高举切 COLOR PRESET）
+      if (lShoulder && rShoulder && lHip && lWrist && lPinky && lIndex &&
+          lShoulder.visibility > 0.5 && rShoulder.visibility > 0.5 &&
+          lHip.visibility > 0.5 && lWrist.visibility > 0.5) {
+        
+        const shoulderDist = dist3D(lShoulder, rShoulder);
+        const wristToPinky = dist3D(lWrist, lPinky);
+        const wristToIndex = dist3D(lWrist, lIndex);
+        const avgHandDist = (wristToPinky + wristToIndex) / 2.0;
+        const handRatio = avgHandDist / shoulderDist;
+        
+        const isHandRaised = lWrist.y < lHip.y; // 左手高度高于臀部
+        const isFist = isHandRaised && (handRatio < 0.11);
+        
+        // 握拳切换 EFFECT (边缘触发，防抖动)
+        if (isFist) {
+          if (!this.lastFistState) {
+            this.triggerEffectSwitch();
+            this.lastFistState = true;
+          }
+          
+          // 画出左手握拳的指示圈
+          const lWristCanvasX = (1.0 - lWrist.x) * width;
+          const lWristCanvasY = lWrist.y * height;
+          ctx.beginPath();
+          ctx.arc(lWristCanvasX, lWristCanvasY, 11, 0, 2 * Math.PI);
+          ctx.strokeStyle = '#00F2FE';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          
+          ctx.fillStyle = '#00F2FE';
+          ctx.font = 'bold 8px monospace';
+          ctx.fillText('FIST [SWAP EFFECT]', lWristCanvasX + 14, lWristCanvasY + 3);
+        } else {
+          this.lastFistState = false;
+          
+          // 高举过肩张开手切换 COLOR PRESET (1 秒悬停)
+          const isHighRaised = lWrist.y < lShoulder.y;
+          if (isHandRaised && isHighRaised && handRatio > 0.14) {
+            if (this.colorTriggerTimer >= 0) {
+              this.colorTriggerTimer += 0.033; // 按帧步长计时
+              
+              const progress = Math.min(1.0, this.colorTriggerTimer / 1.0);
+              const lWristCanvasX = (1.0 - lWrist.x) * width;
+              const lWristCanvasY = lWrist.y * height;
+              
+              // 绘制背景空圆环
+              ctx.beginPath();
+              ctx.arc(lWristCanvasX, lWristCanvasY, 13, 0, 2 * Math.PI);
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+              
+              // 绘制高亮进度圆环
+              ctx.beginPath();
+              ctx.arc(lWristCanvasX, lWristCanvasY, 13, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+              ctx.strokeStyle = '#00ffaa';
+              ctx.lineWidth = 2.5;
+              ctx.stroke();
+              
+              ctx.fillStyle = '#00ffaa';
+              ctx.font = 'bold 8px monospace';
+              ctx.fillText(`HOLD [PRESET] ${Math.floor(progress * 100)}%`, lWristCanvasX + 16, lWristCanvasY + 3);
+              
+              if (this.colorTriggerTimer >= 1.0) {
+                this.triggerPresetSwitch();
+                this.colorTriggerTimer = -1.0; // 锁定，等手放下后重置
+              }
+            } else {
+              // 锁定状态提示
+              ctx.fillStyle = '#ffaa00';
+              ctx.font = 'bold 8px monospace';
+              ctx.fillText('LOCKED (RELEASE HAND)', (1.0 - lWrist.x) * width + 16, lWrist.y * height + 3);
+            }
+          } else {
+            this.colorTriggerTimer = 0.0;
+          }
+        }
+      }
+    } else {
+      this.wristVisible = false;
+      this.updateStatus('yellow', 'NO BODY DETECTED');
+      if (this.coordsEl) this.coordsEl.innerText = 'N/A';
+    }
+  }
+
+// ==========================================
 // THREE.JS PARTICLES BACKGROUND
 // ==========================================
 class SpaceBackground {
@@ -678,6 +989,17 @@ class RibbonApp {
     const currentTime = performance.now();
     const dt = currentTime - this.lastTime;
     this.lastTime = currentTime;
+
+    // 手势模式坐标劫持
+    if (window.controlMode === 'gesture' && window.gestureController && window.gestureController.active) {
+      const coords = window.gestureController.updateSmoothCoords();
+      if (coords.visible) {
+        this.mouseMoved = true;
+        const targetX = coords.x * 2 - 1;
+        const targetY = (1.0 - coords.y) * 2 - 1;
+        this.mouse.set(targetX, targetY, 0);
+      }
+    }
 
     if (!this.mouseMoved) {
       const time = currentTime * 0.001;
@@ -1726,12 +2048,39 @@ class FluidApp {
   }
 
   applyInputs() {
-    this.pointers.forEach(p => {
-      if (p.moved) {
-        p.moved = false;
-        this.splatPointer(p);
+    if (window.controlMode === 'gesture' && window.gestureController && window.gestureController.active) {
+      const coords = window.gestureController.updateSmoothCoords();
+      let pointer = this.pointers[0];
+      if (coords.visible) {
+        const posX = coords.x * this.canvas.width;
+        const posY = coords.y * this.canvas.height;
+        
+        if (!pointer.down) {
+          pointer.down = true;
+          pointer.texcoordX = coords.x;
+          pointer.texcoordY = 1.0 - coords.y;
+          pointer.prevTexcoordX = pointer.texcoordX;
+          pointer.prevTexcoordY = pointer.prevTexcoordY;
+          pointer.color = this.generateColor();
+        }
+        
+        this.updatePointerMoveData(pointer, posX, posY, pointer.color);
+        
+        if (pointer.moved) {
+          pointer.moved = false;
+          this.splatPointer(pointer);
+        }
+      } else {
+        pointer.down = false;
       }
-    });
+    } else {
+      this.pointers.forEach(p => {
+        if (p.moved) {
+          p.moved = false;
+          this.splatPointer(p);
+        }
+      });
+    }
   }
 
   step(dt) {
@@ -1973,6 +2322,30 @@ document.addEventListener('DOMContentLoaded', () => {
   // Instantiate ribbons first (lazy initialize fluidApp on demand)
   window.ribbonApp = new RibbonApp();
   window.fluidApp = null;
+
+  // Control Mode switching logic
+  const modeButtons = document.querySelectorAll('.control-mode-btn');
+  window.controlMode = 'mouse';
+  window.gestureController = new GestureController();
+
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      modeButtons.forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      const mode = e.target.getAttribute('data-mode');
+      window.controlMode = mode;
+
+      const previewGroup = document.querySelector('.camera-preview-group');
+
+      if (mode === 'gesture') {
+        if (previewGroup) previewGroup.style.display = 'block';
+        window.gestureController.start();
+      } else {
+        if (previewGroup) previewGroup.style.display = 'none';
+        window.gestureController.stop();
+      }
+    });
+  });
 
   // Collapsible control panel toggle logic
   const toggleBtn = document.getElementById('btn-toggle-panel');
