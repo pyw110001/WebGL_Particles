@@ -213,11 +213,16 @@ class GestureController {
 
   triggerEffectSwitch() {
     const buttons = document.querySelectorAll('.effect-btn');
-    buttons.forEach(btn => {
-      if (!btn.classList.contains('active')) {
-        btn.click();
+    let activeIndex = -1;
+    buttons.forEach((btn, idx) => {
+      if (btn.classList.contains('active')) {
+        activeIndex = idx;
       }
     });
+    if (activeIndex !== -1) {
+      const nextIndex = (activeIndex + 1) % buttons.length;
+      buttons[nextIndex].click();
+    }
   }
 
   triggerPresetSwitch() {
