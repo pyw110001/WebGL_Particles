@@ -282,6 +282,12 @@ class GestureController {
         return Math.sqrt(dx*dx + dy*dy + dz*dz);
       };
 
+      const dist2D = (p1, p2) => {
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        return Math.sqrt(dx*dx + dy*dy);
+      };
+
       // 右臂 (右肩 12 -> 右肘 14 -> 右手腕 16)
       drawLine(results.poseLandmarks[12], results.poseLandmarks[14]);
       drawLine(results.poseLandmarks[14], results.poseLandmarks[16]);
@@ -360,21 +366,24 @@ class GestureController {
         const lWristCanvasX = (1.0 - lWrist.x) * width;
         const lWristCanvasY = lWrist.y * height;
 
-        // 绘制实时调试信息框
+        const shoulderDist2D = dist2D(lShoulder, rShoulder);
+        let handsOverlap = false;
+        let handToHandDist2D = 999;
+        const overlapThreshold2D = shoulderDist2D * 0.35; // 2D 空间内 35% 肩宽的重叠阈值
+
+        if (rWrist && rWrist.visibility > 0.5) {
+          handToHandDist2D = dist2D(lWrist, rWrist);
+          handsOverlap = handToHandDist2D < overlapThreshold2D;
+        }
+
+        // 绘制实时调试信息框 (扩充为 3 行，提供双手 2D 重叠距离与阈值的调试反馈)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(lWristCanvasX + 15, lWristCanvasY - 25, 80, 24);
+        ctx.fillRect(lWristCanvasX + 15, lWristCanvasY - 33, 95, 32);
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 7px monospace';
-        ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 17);
-        ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 8);
-
-        // 左右手重叠判定 (手部距离小于双肩距离的 0.28)
-        let handsOverlap = false;
-        let handToHandDist = 999;
-        if (rWrist && rWrist.visibility > 0.5) {
-          handToHandDist = dist3D(lWrist, rWrist);
-          handsOverlap = handToHandDist < (shoulderDist * 0.28);
-        }
+        ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 25);
+        ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 16);
+        ctx.fillText(`Overlap: ${handToHandDist2D.toFixed(3)}/${overlapThreshold2D.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 7);
 
         const isHighRaised = lWrist.y < lShoulder.y;
 
