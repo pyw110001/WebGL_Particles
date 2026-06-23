@@ -368,32 +368,43 @@ class GestureController {
         ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 17);
         ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 8);
 
-        const isHighRaised = lWrist.y < lShoulder.y;
-        
-        // 判定特效切换：张手且低于肩膀（但高于肘部区域）
-        const isEffectTriggerZone = isHandRaised && !isHighRaised && isOpenHand;
+        // 左右手重叠判定 (手部距离小于双肩距离的 0.28)
+        let handsOverlap = false;
+        let handToHandDist = 999;
+        if (rWrist && rWrist.visibility > 0.5) {
+          handToHandDist = dist3D(lWrist, rWrist);
+          handsOverlap = handToHandDist < (shoulderDist * 0.28);
+        }
 
-        if (isEffectTriggerZone) {
+        const isHighRaised = lWrist.y < lShoulder.y;
+
+        if (handsOverlap) {
+          // 在两手的中点绘制指示圈
+          const rWristCanvasX = (1.0 - rWrist.x) * width;
+          const rWristCanvasY = rWrist.y * height;
+          const midX = (lWristCanvasX + rWristCanvasX) / 2.0;
+          const midY = (lWristCanvasY + rWristCanvasY) / 2.0;
+
           if (this.lastEffectOpenState) {
             // 已触发状态：画出稳定指示圈和文字
             ctx.beginPath();
-            ctx.arc(lWristCanvasX, lWristCanvasY, 11, 0, 2 * Math.PI);
+            ctx.arc(midX, midY, 13, 0, 2 * Math.PI);
             ctx.strokeStyle = '#00F2FE';
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
             ctx.fillStyle = '#00F2FE';
             ctx.font = 'bold 8px monospace';
-            ctx.fillText('OPEN [SWAP EFFECT]', lWristCanvasX + 15, lWristCanvasY + 12);
+            ctx.fillText('OVERLAP [SWAP EFFECT]', midX + 18, midY + 3);
           } else {
             this.effectTriggerTimer += 0.033;
             
             // 悬停中：画出快速加载进度环 (0.25 秒 hover 防抖动)
             const progress = Math.min(1.0, this.effectTriggerTimer / 0.25);
             ctx.beginPath();
-            ctx.arc(lWristCanvasX, lWristCanvasY, 11, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+            ctx.arc(midX, midY, 13, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
             ctx.strokeStyle = '#00F2FE';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2.5;
             ctx.stroke();
             
             if (this.effectTriggerTimer >= 0.25) {
@@ -404,9 +415,8 @@ class GestureController {
           }
         } else {
           this.effectTriggerTimer = 0.0;
-          if (!isOpenHand || !isHandRaised) {
-            this.lastEffectOpenState = false;
-          }
+          // 双手分开时，重置重叠触发状态
+          this.lastEffectOpenState = false;
           
           // 高举过肩张开手切换 COLOR PRESET (1 秒悬停)
           if (isHandRaised && isHighRaised && isOpenHand) {
