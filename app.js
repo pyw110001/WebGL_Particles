@@ -352,9 +352,20 @@ class GestureController {
         const avgHandDist = (wristToPinky + wristToIndex) / 2.0;
         const handRatio = avgHandDist / shoulderDist;
         
-        const isHandRaised = lWrist.y < lElbow.y; // 左手高度高于肘部
-        const isFist = isHandRaised && (handRatio < 0.11);
+        const isHandRaised = lWrist.y < (lElbow.y + 0.05); // 左手高度高于肘部偏下5%屏高，更加宽松
+        const isFist = isHandRaised && (handRatio < 0.125); // 握拳判定门限从 0.11 放宽到 0.125
         
+        const lWristCanvasX = (1.0 - lWrist.x) * width;
+        const lWristCanvasY = lWrist.y * height;
+
+        // 绘制实时调试信息框
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(lWristCanvasX + 15, lWristCanvasY - 25, 80, 24);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 7px monospace';
+        ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 17);
+        ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 8);
+
         // 握拳切换 EFFECT (边缘触发，防抖动)
         if (isFist) {
           if (!this.lastFistState) {
@@ -363,8 +374,6 @@ class GestureController {
           }
           
           // 画出左手握拳的指示圈
-          const lWristCanvasX = (1.0 - lWrist.x) * width;
-          const lWristCanvasY = lWrist.y * height;
           ctx.beginPath();
           ctx.arc(lWristCanvasX, lWristCanvasY, 11, 0, 2 * Math.PI);
           ctx.strokeStyle = '#00F2FE';
@@ -373,7 +382,7 @@ class GestureController {
           
           ctx.fillStyle = '#00F2FE';
           ctx.font = 'bold 8px monospace';
-          ctx.fillText('FIST [SWAP EFFECT]', lWristCanvasX + 14, lWristCanvasY + 3);
+          ctx.fillText('FIST [SWAP EFFECT]', lWristCanvasX + 15, lWristCanvasY + 12);
         } else {
           this.lastFistState = false;
           
