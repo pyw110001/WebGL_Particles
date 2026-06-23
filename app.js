@@ -367,51 +367,45 @@ class GestureController {
         const lWristCanvasY = lWrist.y * height;
 
         const shoulderDist2D = dist2D(lShoulder, rShoulder);
-        let handsOverlap = false;
-        let handToHandDist2D = 999;
-        const overlapThreshold2D = shoulderDist2D * 0.35; // 2D 空间内 35% 肩宽的重叠阈值
-
-        if (rWrist && rWrist.visibility > 0.5) {
-          handToHandDist2D = dist2D(lWrist, rWrist);
-          handsOverlap = handToHandDist2D < overlapThreshold2D;
+        let handToShoulderDist2D = 999;
+        const touchThreshold2D = shoulderDist2D * 0.45; // 左手腕距离右肩在 45% 肩宽内算“摸右肩”
+        
+        if (rShoulder && rShoulder.visibility > 0.5) {
+          handToShoulderDist2D = dist2D(lWrist, rShoulder);
         }
+        
+        const isTouchShoulder = handToShoulderDist2D < touchThreshold2D;
 
-        // 绘制实时调试信息框 (扩充为 3 行，提供双手 2D 重叠距离与阈值的调试反馈)
+        // 绘制实时调试信息框 (提供左手腕到右肩距离与阈值的调试反馈)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(lWristCanvasX + 15, lWristCanvasY - 33, 95, 32);
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 7px monospace';
         ctx.fillText(`Ratio: ${handRatio.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 25);
         ctx.fillText(`Raised: ${isHandRaised ? 'YES' : 'NO'}`, lWristCanvasX + 19, lWristCanvasY - 16);
-        ctx.fillText(`Overlap: ${handToHandDist2D.toFixed(3)}/${overlapThreshold2D.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 7);
+        ctx.fillText(`Touch: ${handToShoulderDist2D.toFixed(3)}/${touchThreshold2D.toFixed(3)}`, lWristCanvasX + 19, lWristCanvasY - 7);
 
         const isHighRaised = lWrist.y < lShoulder.y;
 
-        if (handsOverlap) {
-          // 在两手的中点绘制指示圈
-          const rWristCanvasX = (1.0 - rWrist.x) * width;
-          const rWristCanvasY = rWrist.y * height;
-          const midX = (lWristCanvasX + rWristCanvasX) / 2.0;
-          const midY = (lWristCanvasY + rWristCanvasY) / 2.0;
-
+        if (isTouchShoulder) {
           if (this.lastEffectOpenState) {
             // 已触发状态：画出稳定指示圈和文字
             ctx.beginPath();
-            ctx.arc(midX, midY, 13, 0, 2 * Math.PI);
+            ctx.arc(lWristCanvasX, lWristCanvasY, 13, 0, 2 * Math.PI);
             ctx.strokeStyle = '#00F2FE';
             ctx.lineWidth = 2.5;
             ctx.stroke();
             
             ctx.fillStyle = '#00F2FE';
             ctx.font = 'bold 8px monospace';
-            ctx.fillText('OVERLAP [SWAP EFFECT]', midX + 18, midY + 3);
+            ctx.fillText('TOUCH [SWAP EFFECT]', lWristCanvasX + 18, lWristCanvasY + 3);
           } else {
             this.effectTriggerTimer += 0.033;
             
             // 悬停中：画出快速加载进度环 (0.25 秒 hover 防抖动)
             const progress = Math.min(1.0, this.effectTriggerTimer / 0.25);
             ctx.beginPath();
-            ctx.arc(midX, midY, 13, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+            ctx.arc(lWristCanvasX, lWristCanvasY, 13, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
             ctx.strokeStyle = '#00F2FE';
             ctx.lineWidth = 2.5;
             ctx.stroke();
@@ -424,7 +418,6 @@ class GestureController {
           }
         } else {
           this.effectTriggerTimer = 0.0;
-          // 双手分开时，重置重叠触发状态
           this.lastEffectOpenState = false;
           
           // 高举过肩张开手切换 COLOR PRESET (1 秒悬停)
