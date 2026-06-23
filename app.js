@@ -781,6 +781,8 @@ class RibbonApp {
     if (!this.container) return;
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
+    this.currentWidth = width;
+    this.currentHeight = height;
     this.renderer.setSize(width, height);
     this.lines.forEach(line => {
       if (line.polyline) line.polyline.resize();
@@ -1042,6 +1044,15 @@ class RibbonApp {
   animate() {
     if (this.paused) return;
     requestAnimationFrame(() => this.animate());
+
+    // Auto resize if container dimensions changed and are valid (fixes display transition race conditions)
+    if (this.container) {
+      const w = this.container.clientWidth;
+      const h = this.container.clientHeight;
+      if (w > 0 && h > 0 && (w !== this.currentWidth || h !== this.currentHeight)) {
+        this.resize();
+      }
+    }
 
     const currentTime = performance.now();
     const dt = currentTime - this.lastTime;
