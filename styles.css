@@ -544,8 +544,8 @@ body {
   transform: scale(0.97);
 }
 
-/* Fluid Canvas Styling */
-#fluid-canvas {
+/* Fluid & ASCII Canvas Styling */
+#fluid-canvas, #ascii-canvas {
   position: absolute;
   top: 0;
   left: 0;
@@ -690,5 +690,87 @@ body {
   padding: 1px 6px;
   font-size: 0.7rem;
   border-radius: 2px;
+}
+
+/* ASCII Custom Controls Styling */
+.hud-text-input {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(240, 240, 250, 0.15);
+  border-radius: 4px;
+  color: #f0f0fa;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  width: 100%;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.hud-text-input:focus {
+  border-color: rgba(240, 240, 250, 0.5);
+  box-shadow: 0 0 10px rgba(240, 240, 250, 0.1);
+}
+
+.hud-select {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(240, 240, 250, 0.15);
+  border-radius: 4px;
+  color: #f0f0fa;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  transition: all 0.3s ease;
+}
+
+.hud-select:focus {
+  border-color: rgba(240, 240, 250, 0.5);
+}
+
+.hud-file-btn {
+  display: inline-block;
+  background: transparent;
+  border: 1px solid rgba(240, 240, 250, 0.2);
+  border-radius: 4px;
+  color: rgba(240, 240, 250, 0.8);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s ease;
+  width: fit-content;
+}
+
+.hud-file-btn:hover {
+  border-color: rgba(240, 240, 250, 0.5);
+  background: rgba(240, 240, 250, 0.05);
+  color: #f0f0fa;
+}
+
+.file-name-value {
+  font-size: 0.75rem;
+  color: rgba(240, 240, 250, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.video-meta-value {
+  font-size: 0.75rem;
+  color: rgba(240, 240, 250, 0.6);
+}
+
+.mini-btn {
+  padding: 3px 8px !important;
+  font-size: 0.7rem !important;
+  height: auto !important;
+  min-height: unset !important;
 }
 

@@ -1,6 +1,11 @@
 // Import OGL and Three.js from CDN
 import { Renderer, Transform, Vec3, Color, Polyline } from 'https://esm.sh/ogl@0.0.90';
 import * as THREE from 'https://esm.sh/three@0.152.0';
+import { gsap } from 'https://esm.sh/gsap@3.12.2';
+import { processImageToAscii } from './src/ascii/imageProcessing.js';
+import { TrailManager } from './src/ascii/trailManager.js';
+import { AsciiRenderer } from './src/ascii/renderer.js';
+import { VIDEO_FRAME_RATE, extractVideoFrames, processVideoFramesToAscii } from './src/ascii/videoProcessing.js';
 
 // Color Preset Configurations
 const PRESETS = {
@@ -973,6 +978,10 @@ class RibbonApp {
 
         if (window.fluidApp) {
           window.fluidApp.reset();
+        }
+
+        if (window.asciiApp) {
+          window.asciiApp.reset();
         }
 
         this.triggerSystemAlert('SYSTEM COLD REBOOT COMPLETE', 'status-nominal');
@@ -2366,6 +2375,621 @@ class FluidApp {
   }
 }
 
+// ==========================================
+// EFFECT 3: FOTO-ASCII IMAGE REVEAL
+// ==========================================
+class AsciiTrailApp {
+  constructor() {
+    this.canvas = document.getElementById('ascii-canvas');
+    if (!this.canvas) return;
+    
+    this.paused = true;
+    this.lastTime = performance.now();
+    this.animationFrameId = null;
+
+    // Config parameters
+    this.config = {
+      cellSize: 10,
+      trailRadius: 138,
+      fadeDuration: 1.35,
+      characterSet: "@#S%?*+;:.,",
+      colorMode: "source", // "source" | "luminance" | "mono"
+      invertMode: false,
+    };
+
+    this.trail = new TrailManager({
+      cellSize: this.config.cellSize,
+      trailRadius: this.config.trailRadius,
+      fadeDuration: this.config.fadeDuration,
+      ease: "power3.out",
+    });
+
+    this.renderer = new AsciiRenderer(this.canvas);
+    this.processedImage = null;
+    this.rawVideoFrames = null;
+    this.videoAsciiFrames = [];
+    this.rawVideoVersion = 0;
+    this.mediaSource = {
+      type: "image",
+      id: "default-image",
+      src: "assets/space_bg.png",
+      name: "Space Background",
+    };
+    this.mediaStatus = {
+      phase: "sampling",
+      label: "Sampling image",
+      progress: null,
+      error: null,
+    };
+
+    this.videoPlayback = {
+      isPlaying: true,
+      startedAt: performance.now(),
+      pauseOffset: 0,
+      frameRate: VIDEO_FRAME_RATE,
+    };
+
+    this.autoRevealAlpha = { value: 0 };
+    this.autoRevealTimeline = null;
+    this.hasStartedAutoReveal = false;
+    this.sourceObjectUrl = null;
+
+    // FPS / telemetry speed tracking
+    this.currentSpeed = 0;
+    this.prevMouse = { x: 0, y: 0 };
+    this.fpsFrameCount = 0;
+    this.lastFpsTime = performance.now();
+
+    this.resize();
+    this.setupEventListeners();
+    this.processCurrentImage();
+  }
+
+  resize() {
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    if (w > 0 && h > 0) {
+      this.renderer.resize(w, h);
+    }
+  }
+
+  setupEventListeners() {
+    // Pointer move listener for trail points
+    const addPoint = (x, y, force = false) => {
+      if (this.paused) return;
+      this.startAutoRevealLoop();
+      
+      const rect = this.canvas.getBoundingClientRect();
+      const canvasX = x - rect.left;
+      const canvasY = y - rect.top;
+      this.trail.addPoint(canvasX, canvasY, { force });
+
+      // Track pointer velocity for speed telemetry
+      const dx = canvasX - this.prevMouse.x;
+      const dy = canvasY - this.prevMouse.y;
+      const dist = Math.hypot(dx, dy);
+      this.currentSpeed = this.currentSpeed * 0.9 + dist * 0.1;
+      this.prevMouse.x = canvasX;
+      this.prevMouse.y = canvasY;
+    };
+
+    window.addEventListener("mousemove", (e) => {
+      if (window.controlMode === "mouse") {
+        addPoint(e.clientX, e.clientY);
+      }
+    }, { passive: true });
+
+    window.addEventListener("mousedown", (e) => {
+      if (window.controlMode === "mouse") {
+        addPoint(e.clientX, e.clientY, true);
+      }
+    }, { passive: true });
+
+    window.addEventListener("touchmove", (e) => {
+      if (window.controlMode === "mouse" && e.touches.length > 0) {
+        addPoint(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    // Slider controls binding
+    const cellInput = document.getElementById("input-ascii-cell");
+    const radiusInput = document.getElementById("input-ascii-radius");
+    const fadeInput = document.getElementById("input-ascii-fade");
+    const charsInput = document.getElementById("input-ascii-chars");
+    const colorSelect = document.getElementById("input-ascii-color");
+    const invertInput = document.getElementById("input-ascii-invert");
+    const fileInput = document.getElementById("input-ascii-file");
+    const playBtn = document.getElementById("btn-ascii-play");
+
+    const cellVal = document.getElementById("val-ascii-cell");
+    const radiusVal = document.getElementById("val-ascii-radius");
+    const fadeVal = document.getElementById("val-ascii-fade");
+    const fileNameVal = document.getElementById("val-ascii-file-name");
+
+    if (cellInput && cellVal) {
+      cellInput.addEventListener("input", (e) => {
+        this.config.cellSize = parseInt(e.target.value);
+        cellVal.innerText = `${this.config.cellSize}px`;
+        this.trail.setOptions({ cellSize: this.config.cellSize });
+        this.reprocessCurrentMedia();
+      });
+    }
+
+    if (radiusInput && radiusVal) {
+      radiusInput.addEventListener("input", (e) => {
+        this.config.trailRadius = parseInt(e.target.value);
+        radiusVal.innerText = `${this.config.trailRadius}px`;
+        this.trail.setOptions({ trailRadius: this.config.trailRadius });
+      });
+    }
+
+    if (fadeInput && fadeVal) {
+      fadeInput.addEventListener("input", (e) => {
+        this.config.fadeDuration = parseFloat(e.target.value);
+        fadeVal.innerText = `${this.config.fadeDuration.toFixed(2)}s`;
+        this.trail.setOptions({ fadeDuration: this.config.fadeDuration });
+      });
+    }
+
+    if (charsInput) {
+      charsInput.addEventListener("input", (e) => {
+        this.config.characterSet = e.target.value || "@#S%?*+;:.,";
+        this.reprocessCurrentMedia();
+      });
+    }
+
+    if (colorSelect) {
+      colorSelect.addEventListener("change", (e) => {
+        this.config.colorMode = e.target.value;
+      });
+    }
+
+    if (invertInput) {
+      invertInput.addEventListener("change", (e) => {
+        this.config.invertMode = e.target.checked;
+        this.reprocessCurrentMedia();
+      });
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (fileNameVal) {
+          fileNameVal.innerText = file.name;
+        }
+
+        const isAnimated = file.type.startsWith("video/") || file.type === "image/gif" || /\.gif$/i.test(file.name);
+        this.releaseSourceObjectUrl();
+
+        if (isAnimated) {
+          this.mediaSource = {
+            type: "video",
+            id: `${file.name}-${file.size}-${Date.now()}`,
+            file,
+            name: file.name
+          };
+          this.processCurrentVideo();
+        } else if (file.type.startsWith("image/")) {
+          const url = URL.createObjectURL(file);
+          this.sourceObjectUrl = url;
+          this.mediaSource = {
+            type: "image",
+            id: `${file.name}-${file.size}-${Date.now()}`,
+            src: url,
+            name: file.name
+          };
+          this.processCurrentImage();
+        } else {
+          this.updateStatus("error", "Unsupported media type", null, "Unsupported file format.");
+        }
+      });
+    }
+
+    if (playBtn) {
+      playBtn.addEventListener("click", () => {
+        this.toggleVideoPlayback();
+      });
+    }
+  }
+
+  releaseSourceObjectUrl() {
+    if (this.sourceObjectUrl) {
+      URL.revokeObjectURL(this.sourceObjectUrl);
+      this.sourceObjectUrl = null;
+    }
+  }
+
+  updateStatus(phase, label, progress = null, error = null) {
+    this.mediaStatus = { phase, label, progress, error };
+    
+    // Update telemetry status overlay
+    const statusText = this.formatStatusText(this.mediaStatus);
+    const systemStatusEl = document.getElementById("tel-pose-status"); // hijack pose status for media processing info
+    if (systemStatusEl) {
+      systemStatusEl.innerText = statusText.toUpperCase();
+      if (phase === "error") {
+        systemStatusEl.className = "tel-val font-mono status-failed";
+      } else if (phase === "ready") {
+        systemStatusEl.className = "tel-val font-mono status-nominal";
+      } else {
+        systemStatusEl.className = "tel-val font-mono status-calibrating";
+      }
+    }
+  }
+
+  formatStatusText(status) {
+    if (status.phase === "error") return status.error || "Error";
+    if (typeof status.progress === "number" && status.phase !== "ready") {
+      return `${status.label} ${Math.round(status.progress)}%`;
+    }
+    return status.label;
+  }
+
+  startAutoRevealLoop() {
+    if (this.hasStartedAutoReveal || this.paused) return;
+    this.hasStartedAutoReveal = true;
+
+    if (this.autoRevealTimeline) {
+      this.autoRevealTimeline.kill();
+    }
+    this.autoRevealAlpha.value = 0;
+
+    const AUTO_REVEAL_DELAY = 10;
+    const AUTO_REVEAL_FADE_DURATION = 3;
+    const AUTO_REVEAL_HOLD_DURATION = 5;
+
+    this.autoRevealTimeline = gsap.timeline({ repeat: -1 })
+      .to(this.autoRevealAlpha, {
+        value: 0,
+        duration: AUTO_REVEAL_DELAY,
+        ease: "none"
+      })
+      .to(this.autoRevealAlpha, {
+        value: 1,
+        duration: AUTO_REVEAL_FADE_DURATION,
+        ease: "power2.inOut"
+      })
+      .to(this.autoRevealAlpha, {
+        value: 1,
+        duration: AUTO_REVEAL_HOLD_DURATION,
+        ease: "none"
+      })
+      .to(this.autoRevealAlpha, {
+        value: 0,
+        duration: AUTO_REVEAL_FADE_DURATION,
+        ease: "power2.inOut"
+      });
+  }
+
+  stopAutoRevealLoop() {
+    if (this.autoRevealTimeline) {
+      this.autoRevealTimeline.kill();
+      this.autoRevealTimeline = null;
+    }
+    this.autoRevealAlpha.value = 0;
+    this.hasStartedAutoReveal = false;
+  }
+
+  async processCurrentImage() {
+    this.processedImage = null;
+    this.rawVideoFrames = null;
+    this.videoAsciiFrames = [];
+    this.stopAutoRevealLoop();
+
+    // Hide video controls
+    const vidControls = document.getElementById("ascii-video-controls");
+    if (vidControls) vidControls.style.display = "none";
+
+    this.updateStatus("sampling", "Sampling image");
+
+    try {
+      const processed = await processImageToAscii({
+        src: this.mediaSource.src,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        cellSize: this.config.cellSize,
+        characterSet: this.config.characterSet,
+        invertMode: this.config.invertMode
+      });
+      this.processedImage = processed;
+      this.updateStatus("ready", "Ready");
+    } catch (err) {
+      this.updateStatus("error", "Error", null, err.message);
+      console.error(err);
+    }
+  }
+
+  async processCurrentVideo() {
+    this.processedImage = null;
+    this.rawVideoFrames = null;
+    this.videoAsciiFrames = [];
+    this.stopAutoRevealLoop();
+
+    const vidControls = document.getElementById("ascii-video-controls");
+    if (vidControls) vidControls.style.display = "block";
+
+    this.updateStatus("uploading", "Uploading video");
+    const sourceId = this.mediaSource.id;
+
+    try {
+      const rawVideo = await extractVideoFrames({
+        file: this.mediaSource.file,
+        onStatus: (status) => {
+          if (this.mediaSource.id === sourceId) {
+            this.updateStatus(status.phase, status.label, status.progress, status.error);
+          }
+        }
+      });
+
+      if (this.mediaSource.id !== sourceId) return;
+      this.rawVideoFrames = rawVideo;
+
+      // Update UI with video metadata
+      const metaVal = document.getElementById("val-ascii-video-meta");
+      if (metaVal) {
+        metaVal.innerText = `${rawVideo.frames.length} frames @ ${rawVideo.frameRate}fps`;
+      }
+
+      this.updateStatus("processing", "Processing frames");
+      
+      const asciiFrames = await processVideoFramesToAscii({
+        frames: rawVideo.frames,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        cellSize: this.config.cellSize,
+        characterSet: this.config.characterSet,
+        invertMode: this.config.invertMode,
+        onStatus: (status) => {
+          if (this.mediaSource.id === sourceId) {
+            this.updateStatus(status.phase, status.label, status.progress, status.error);
+          }
+        }
+      });
+
+      if (this.mediaSource.id !== sourceId) return;
+      this.videoAsciiFrames = asciiFrames;
+      this.videoPlayback = {
+        isPlaying: true,
+        startedAt: performance.now(),
+        pauseOffset: 0,
+        frameRate: rawVideo.frameRate
+      };
+
+      const playBtn = document.getElementById("btn-ascii-play");
+      if (playBtn) playBtn.innerText = "PAUSE";
+
+      this.updateStatus("ready", "Ready");
+    } catch (err) {
+      this.updateStatus("error", "Error", null, err.message);
+      console.error(err);
+    }
+  }
+
+  reprocessCurrentMedia() {
+    if (this.mediaSource.type === "video" && this.rawVideoFrames) {
+      const sourceId = this.mediaSource.id;
+      this.updateStatus("processing", "Processing frames");
+      
+      processVideoFramesToAscii({
+        frames: this.rawVideoFrames.frames,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        cellSize: this.config.cellSize,
+        characterSet: this.config.characterSet,
+        invertMode: this.config.invertMode,
+        onStatus: (status) => {
+          if (this.mediaSource.id === sourceId) {
+            this.updateStatus(status.phase, status.label, status.progress, status.error);
+          }
+        }
+      }).then(asciiFrames => {
+        if (this.mediaSource.id !== sourceId) return;
+        this.videoAsciiFrames = asciiFrames;
+        this.videoPlayback.startedAt = performance.now() - this.videoPlayback.pauseOffset * 1000;
+        this.updateStatus("ready", "Ready");
+      }).catch(err => {
+        this.updateStatus("error", "Error", null, err.message);
+      });
+    } else if (this.mediaSource.type === "image") {
+      this.processCurrentImage();
+    }
+  }
+
+  toggleVideoPlayback() {
+    const playback = this.videoPlayback;
+    const playBtn = document.getElementById("btn-ascii-play");
+    if (!playBtn) return;
+
+    if (playback.isPlaying) {
+      const elapsed = (performance.now() - playback.startedAt) / 1000;
+      const duration = this.videoAsciiFrames.length / playback.frameRate;
+      playback.pauseOffset = duration > 0 ? elapsed % duration : elapsed;
+      playback.isPlaying = false;
+      playBtn.innerText = "PLAY";
+    } else {
+      playback.startedAt = performance.now() - playback.pauseOffset * 1000;
+      playback.isPlaying = true;
+      playBtn.innerText = "PAUSE";
+    }
+  }
+
+  selectVideoFrame() {
+    const frames = this.videoAsciiFrames;
+    if (!frames || !frames.length) return null;
+
+    const playback = this.videoPlayback;
+    const duration = frames.length / playback.frameRate;
+    const elapsed = playback.isPlaying
+      ? (performance.now() - playback.startedAt) / 1000
+      : playback.pauseOffset;
+    const loopTime = duration > 0 ? elapsed % duration : 0;
+    const index = Math.min(frames.length - 1, Math.floor(loopTime * playback.frameRate));
+    return frames[index];
+  }
+
+  pause() {
+    this.paused = true;
+    this.stopAutoRevealLoop();
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    // Update active HUD status
+    const shaderStatusEl = document.getElementById('tel-shader-status');
+    if (shaderStatusEl) shaderStatusEl.innerText = 'PAUSED';
+  }
+
+  resume() {
+    this.paused = false;
+    this.lastTime = performance.now();
+    
+    // Sync HUD status
+    const shaderStatusEl = document.getElementById('tel-shader-status');
+    if (shaderStatusEl) shaderStatusEl.innerText = 'ACTIVE';
+
+    if (!this.animationFrameId) {
+      this.animate();
+    }
+  }
+
+  reset() {
+    this.config = {
+      cellSize: 10,
+      trailRadius: 138,
+      fadeDuration: 1.35,
+      characterSet: "@#S%?*+;:.,",
+      colorMode: "source",
+      invertMode: false,
+    };
+
+    // Reset UI inputs
+    const cellInput = document.getElementById("input-ascii-cell");
+    const radiusInput = document.getElementById("input-ascii-radius");
+    const fadeInput = document.getElementById("input-ascii-fade");
+    const charsInput = document.getElementById("input-ascii-chars");
+    const colorSelect = document.getElementById("input-ascii-color");
+    const invertInput = document.getElementById("input-ascii-invert");
+
+    const cellVal = document.getElementById("val-ascii-cell");
+    const radiusVal = document.getElementById("val-ascii-radius");
+    const fadeVal = document.getElementById("val-ascii-fade");
+    const fileNameVal = document.getElementById("val-ascii-file-name");
+
+    if (cellInput) cellInput.value = 10;
+    if (radiusInput) radiusInput.value = 138;
+    if (fadeInput) fadeInput.value = 1.35;
+    if (charsInput) charsInput.value = "@#S%?*+;:.,";
+    if (colorSelect) colorSelect.value = "source";
+    if (invertInput) invertInput.checked = false;
+
+    if (cellVal) cellVal.innerText = "10px";
+    if (radiusVal) radiusVal.innerText = "138px";
+    if (fadeVal) fadeVal.innerText = "1.35s";
+    if (fileNameVal) fileNameVal.innerText = "Default space bg";
+
+    this.trail.setOptions({
+      cellSize: this.config.cellSize,
+      trailRadius: this.config.trailRadius,
+      fadeDuration: this.config.fadeDuration,
+    });
+
+    this.mediaSource = {
+      type: "image",
+      id: "default-image",
+      src: "assets/space_bg.png",
+      name: "Space Background",
+    };
+
+    this.releaseSourceObjectUrl();
+    this.processCurrentImage();
+  }
+
+  animate() {
+    if (this.paused) return;
+    this.animationFrameId = requestAnimationFrame(() => this.animate());
+
+    // Resolve viewport size changes
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    if (w > 0 && h > 0 && (w !== this.canvas.width / (window.devicePixelRatio || 1) || h !== this.canvas.height / (window.devicePixelRatio || 1))) {
+      this.resize();
+      this.reprocessCurrentMedia();
+    }
+
+    // Gesture input coordinates hijacking
+    let pointerActive = false;
+    let pointerX = 0;
+    let pointerY = 0;
+
+    if (window.controlMode === 'gesture' && window.gestureController && window.gestureController.active) {
+      const coords = window.gestureController.updateSmoothCoords();
+      if (coords.visible) {
+        pointerX = coords.x * this.canvas.width / (window.devicePixelRatio || 1);
+        pointerY = coords.y * this.canvas.height / (window.devicePixelRatio || 1);
+        pointerActive = true;
+
+        this.startAutoRevealLoop();
+        this.trail.addPoint(pointerX, pointerY);
+        
+        // Track pointer velocity for speed telemetry
+        const dx = pointerX - this.prevMouse.x;
+        const dy = pointerY - this.prevMouse.y;
+        const dist = Math.hypot(dx, dy);
+        this.currentSpeed = this.currentSpeed * 0.9 + dist * 0.1;
+        this.prevMouse.x = pointerX;
+        this.prevMouse.y = pointerY;
+      }
+    }
+
+    // Telemetry Mouse X/Y and Speed
+    if (pointerActive || window.controlMode === "mouse") {
+      let displayX = pointerActive ? pointerX : this.prevMouse.x;
+      let displayY = pointerActive ? pointerY : this.prevMouse.y;
+      const normX = (displayX / (this.canvas.width / (window.devicePixelRatio || 1))) * 2 - 1;
+      const normY = (1.0 - (displayY / (this.canvas.height / (window.devicePixelRatio || 1)))) * 2 - 1;
+      
+      const mouseXEl = document.getElementById('tel-mouse-x');
+      const mouseYEl = document.getElementById('tel-mouse-y');
+      if (mouseXEl) mouseXEl.innerText = (normX >= 0 ? '+' : '') + normX.toFixed(4);
+      if (mouseYEl) mouseYEl.innerText = (normY >= 0 ? '+' : '') + normY.toFixed(4);
+    }
+
+    const speedKmS = (this.currentSpeed * 0.5).toFixed(2);
+    const speedEl = document.getElementById('tel-speed');
+    if (speedEl) speedEl.innerText = `${speedKmS} km/s`;
+
+    // FPS Telemetry
+    const currentTime = performance.now();
+    this.fpsFrameCount++;
+    if (currentTime - this.lastFpsTime >= 1000) {
+      const fpsVal = document.getElementById('tel-fps');
+      if (fpsVal) {
+        fpsVal.innerText = ((this.fpsFrameCount * 1000) / (currentTime - this.lastFpsTime)).toFixed(1);
+      }
+      this.fpsFrameCount = 0;
+      this.lastFpsTime = currentTime;
+    }
+
+    // Select the current frame (image cell or video frame cell)
+    const processedImage = this.mediaSource.type === "video"
+      ? this.selectVideoFrame()
+      : this.processedImage;
+
+    this.renderer.render({
+      processedImage,
+      trail: this.trail,
+      params: this.config,
+      width: this.canvas.clientWidth,
+      height: this.canvas.clientHeight,
+      isImageReady: this.mediaStatus.phase === "ready",
+      statusText: this.formatStatusText(this.mediaStatus),
+      globalRevealAlpha: this.autoRevealAlpha.value,
+    });
+  }
+}
+
 // Custom status CSS styles for sync trigger
 const styleSheet = document.createElement('style');
 styleSheet.innerText = `
@@ -2390,6 +3014,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Instantiate ribbons first (lazy initialize fluidApp on demand)
   window.ribbonApp = new RibbonApp();
   window.fluidApp = null;
+  window.asciiApp = null;
 
   // Control Mode switching logic
   const modeButtons = document.querySelectorAll('.control-mode-btn');
@@ -2433,8 +3058,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const effectButtons = document.querySelectorAll('.effect-btn');
   const ribbonCanvasContainer = document.getElementById('canvas-container');
   const fluidCanvas = document.getElementById('fluid-canvas');
+  const asciiCanvas = document.getElementById('ascii-canvas');
   const ribbonSettings = document.getElementById('ribbon-settings');
   const fluidSettings = document.getElementById('fluid-settings');
+  const asciiSettings = document.getElementById('ascii-settings');
 
   effectButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -2448,22 +3075,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // Switch views
         ribbonCanvasContainer.style.display = 'block';
         fluidCanvas.style.display = 'none';
+        if (asciiCanvas) asciiCanvas.style.display = 'none';
         
         // Switch settings panel
         ribbonSettings.style.display = 'grid';
         fluidSettings.style.display = 'none';
+        if (asciiSettings) asciiSettings.style.display = 'none';
 
         // Pause/Resume loop handlers
         if (window.fluidApp) window.fluidApp.pause();
+        if (window.asciiApp) window.asciiApp.pause();
         window.ribbonApp.resume();
-      } else {
+      } else if (effect === 'fluids') {
         // Switch views
         ribbonCanvasContainer.style.display = 'none';
         fluidCanvas.style.display = 'block';
+        if (asciiCanvas) asciiCanvas.style.display = 'none';
 
         // Switch settings panel
         ribbonSettings.style.display = 'none';
         fluidSettings.style.display = 'grid';
+        if (asciiSettings) asciiSettings.style.display = 'none';
 
         // Lazy initialize fluidApp when clicked for the first time
         if (!window.fluidApp) {
@@ -2472,7 +3104,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Pause/Resume loop handlers
         window.ribbonApp.pause();
+        if (window.asciiApp) window.asciiApp.pause();
         window.fluidApp.resume();
+      } else if (effect === 'ascii') {
+        // Switch views
+        ribbonCanvasContainer.style.display = 'none';
+        fluidCanvas.style.display = 'none';
+        if (asciiCanvas) asciiCanvas.style.display = 'block';
+
+        // Switch settings panel
+        ribbonSettings.style.display = 'none';
+        fluidSettings.style.display = 'none';
+        if (asciiSettings) asciiSettings.style.display = 'grid';
+
+        // Lazy initialize asciiApp when clicked for the first time
+        if (!window.asciiApp) {
+          window.asciiApp = new AsciiTrailApp();
+        }
+
+        // Pause/Resume loop handlers
+        window.ribbonApp.pause();
+        if (window.fluidApp) window.fluidApp.pause();
+        window.asciiApp.resume();
       }
     });
   });

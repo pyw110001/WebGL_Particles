@@ -62,6 +62,9 @@
   <!-- Interactive Fluid WebGL Canvas -->
   <canvas id="fluid-canvas"></canvas>
 
+  <!-- Interactive ASCII Canvas -->
+  <canvas id="ascii-canvas"></canvas>
+
 
 
   <!-- SpaceX telemetry HUD Header -->
@@ -141,6 +144,7 @@
           <span class="presets-label">EFFECT:</span>
           <button class="effect-btn active" data-effect="ribbons">RIBBONS</button>
           <button class="effect-btn" data-effect="fluids">FLUIDS</button>
+          <button class="effect-btn" data-effect="ascii">FOTO-ASCII</button>
         </div>
         <div class="control-mode-group">
           <span class="presets-label">INPUT MODE:</span>
@@ -285,6 +289,85 @@
             <input type="checkbox" id="input-shading" checked>
             <span class="switch-slider"></span>
           </label>
+        </div>
+      </div>
+
+      <!-- ASCII SETTINGS SUBGRID -->
+      <div id="ascii-settings" class="settings-subgrid" style="display: none;">
+        <!-- Cell Size -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">CELL SIZE</span>
+            <span id="val-ascii-cell" class="control-value font-mono">10px</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-ascii-cell" min="6" max="22" step="1" value="10" class="hud-slider">
+          </div>
+        </div>
+
+        <!-- Reveal Radius -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">REVEAL RADIUS</span>
+            <span id="val-ascii-radius" class="control-value font-mono">138px</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-ascii-radius" min="54" max="260" step="2" value="138" class="hud-slider">
+          </div>
+        </div>
+
+        <!-- Fade Duration -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span class="control-name">FADE DURATION</span>
+            <span id="val-ascii-fade" class="control-value font-mono">1.35s</span>
+          </div>
+          <div class="slider-container">
+            <input type="range" id="input-ascii-fade" min="0.45" max="3.2" step="0.05" value="1.35" class="hud-slider">
+          </div>
+        </div>
+
+        <!-- Character Set -->
+        <div class="control-group text-control-group">
+          <span class="control-name">CHARACTER SET</span>
+          <input type="text" id="input-ascii-chars" value="@#S%?*+;:.," class="hud-text-input">
+        </div>
+
+        <!-- Color Mode -->
+        <div class="control-group select-control-group">
+          <span class="control-name">COLOR MODE</span>
+          <select id="input-ascii-color" class="hud-select">
+            <option value="source">SOURCE</option>
+            <option value="luminance">LUMA</option>
+            <option value="mono">MONO</option>
+          </select>
+        </div>
+
+        <!-- Invert Mode -->
+        <div class="control-group toggle-group">
+          <span class="control-name">INVERT MODE</span>
+          <label class="hud-switch">
+            <input type="checkbox" id="input-ascii-invert">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- File Upload -->
+        <div class="control-group file-control-group">
+          <span class="control-name">SELECT MEDIA</span>
+          <label class="hud-file-btn">
+            CHOOSE FILE
+            <input type="file" id="input-ascii-file" accept="image/*,video/*" style="display: none;">
+          </label>
+          <span id="val-ascii-file-name" class="control-value font-mono file-name-value">Default space bg</span>
+        </div>
+
+        <!-- Video Controls (hidden by default) -->
+        <div id="ascii-video-controls" class="control-group video-controls-group" style="display: none; grid-column: span 2;">
+          <div class="control-label-row">
+            <button id="btn-ascii-play" class="ghost-btn mini-btn">PAUSE</button>
+            <span id="val-ascii-video-meta" class="control-value font-mono video-meta-value">0 frames @ 10fps</span>
+          </div>
         </div>
       </div>
     </div>
